@@ -106,8 +106,7 @@ def launch_gui() -> int:
             form.addRow("Save results in", destination_row)
 
             self.profile = QComboBox()
-            self.profile.addItem("Small — recommended for M1 Air", "small")
-            self.profile.addItem("Medium — slower, M1 Pro 16 GB", "medium")
+            self.profile.addItem("Small — bundled, recommended for M1 Air", "small")
             form.addRow("Model", self.profile)
 
             self.instruments = QLineEdit()
