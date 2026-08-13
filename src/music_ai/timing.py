@@ -140,4 +140,3 @@ def tempo_changes(
         )
         changes.append(TempoChange(left.position_quarters, qpm))
     return changes
-

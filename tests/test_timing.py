@@ -43,4 +43,3 @@ def test_simplification_obeys_wall_clock_error_bound() -> None:
 def test_tempo_changes_follow_retained_anchor_intervals() -> None:
     changes = tempo_changes(timing((0, 0), (0.5, 1), (1.5, 2)), max_error_seconds=0)
     assert [(item.position_quarters, item.qpm) for item in changes] == pytest.approx([(0, 120), (1, 60)])
-
