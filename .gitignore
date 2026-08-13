@@ -32,3 +32,8 @@ outputs/
 .DS_Store
 .idea/
 .vscode/
+
+# Local desktop app builds (may contain personal gated model weights)
+build/
+dist/
+*.spec

@@ -116,6 +116,22 @@ both piano and violin and must not be treated as an instrument identity.
 
 ## Apple Silicon setup
 
+## Native personal Mac app
+
+`music_ai.gui` provides a normal macOS window for choosing audio and a result
+folder, selecting the Small/Medium profile, optionally listing expected
+instruments, and confirming meter/pulse interpretation. The personal packaged
+build can include already-authorized local Small and Beat This weights for
+fully offline use; model-containing app bundles must not be committed to this
+repository.
+
+For a development launch:
+
+```bash
+python -m pip install -e ".[dev,muscriptor,timing,ui]"
+music-ai-gui
+```
+
 Use a **native ARM Python 3.11**. It is selected deliberately because the audio-ML dependencies are more reliable there than on the system Python 3.12. Avoid an Intel/Rosetta interpreter: check that the command below prints `arm64` before creating the environment.
 
 ```bash

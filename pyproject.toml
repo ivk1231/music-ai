@@ -24,9 +24,11 @@ dev = ["pytest>=8.0"]
 review = ["streamlit>=1.39"]
 muscriptor = ["muscriptor==0.3.0"]
 timing = ["beat-this==1.1.0"]
+ui = ["PySide6>=6.7,<7", "pyinstaller>=6.10,<7"]
 
 [project.scripts]
 music-ai = "music_ai.cli:app"
+music-ai-gui = "music_ai.gui:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

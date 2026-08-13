@@ -95,6 +95,7 @@ class MuscriptorTranscriber:
         model_size: str = "small",
         device: str = "auto",
         dtype: str | None = None,
+        weights_path: str | Path | None = None,
         model_loader: Callable[..., Any] | None = None,
     ) -> None:
         if model_size not in self.ALLOWED_MODELS:
@@ -104,6 +105,7 @@ class MuscriptorTranscriber:
         self.model_size = model_size
         self.device = device
         self.dtype = dtype
+        self.weights_path = weights_path
         self._model_loader = model_loader
         self._model = None
 
@@ -122,7 +124,9 @@ class MuscriptorTranscriber:
 
         device = None if self.device == "auto" else self.device
         try:
-            self._model = loader(self.model_size, device=device, dtype=self.dtype)
+            self._model = loader(
+                self.weights_path or self.model_size, device=device, dtype=self.dtype
+            )
         except Exception as exc:
             message = str(exc).lower()
             if "gated" in message or "401" in message or "403" in message:
@@ -195,6 +199,7 @@ class MuscriptorTranscriber:
         meter_numerator: int | None = None,
         meter_denominator: int | None = None,
         beat_unit_quarters: float | None = None,
+        beat_checkpoint: str = "final0",
     ) -> ScoreArtifact:
         from .midi import write_multitrack_midi
         from .notation import write_musicxml
@@ -214,7 +219,7 @@ class MuscriptorTranscriber:
                 from .beat_tracking import BeatThisTracker
                 from .quantization import quantize_parts
 
-                timing_map = BeatThisTracker().track(
+                timing_map = BeatThisTracker(checkpoint=beat_checkpoint).track(
                     audio_path,
                     numerator=meter_numerator,
                     denominator=meter_denominator,
