@@ -23,6 +23,7 @@ dependencies = [
 dev = ["pytest>=8.0"]
 review = ["streamlit>=1.39"]
 muscriptor = ["muscriptor==0.3.0"]
+timing = ["beat-this==1.1.0"]
 
 [project.scripts]
 music-ai = "music_ai.cli:app"

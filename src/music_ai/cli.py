@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Annotated
 
 import typer
@@ -17,6 +19,8 @@ from .midi import write_multitrack_midi
 from .notation import write_musicxml
 from .domain import ScoreArtifact
 from .muscriptor_transcription import MuscriptorTranscriber, MuscriptorUnavailableError
+from .beat_tracking import BeatThisTracker, BeatTrackingError
+from .quantization import quantize_parts
 
 app = typer.Typer(no_args_is_help=True, help="Audio to editable MIDI baseline.")
 
@@ -53,20 +57,77 @@ def transcribe_score(
     instruments: Annotated[str, typer.Option(help="Optional comma-separated MuScriptor instrument names, e.g. acoustic_piano,violin.")] = "",
     device: Annotated[str, typer.Option(help="auto selects Apple Metal; mps and cpu are also valid.")] = "auto",
     bpm: Annotated[int, typer.Option(min=20, max=300, help="Temporary notation timing assumption.")] = 120,
+    detect_timing: Annotated[bool, typer.Option("--detect-timing/--fixed-tempo", help="Detect beats, downbeats, and changing tempo for notation.")] = True,
+    meter: Annotated[str, typer.Option(help="Optional meter override such as 3/4 or 6/8.")] = "",
+    beat_unit: Annotated[float | None, typer.Option(help="Quarter lengths per detected pulse; use 1.5 for compound dotted-quarter beats.")] = None,
 ) -> None:
     """Transcribe a full mix directly into instrument-specific score parts."""
     conditioned = [item.strip() for item in instruments.split(",") if item.strip()] or None
+    meter_numerator = meter_denominator = None
+    if meter:
+        try:
+            meter_numerator, meter_denominator = (int(value) for value in meter.split("/", 1))
+        except (ValueError, TypeError) as exc:
+            raise typer.BadParameter("Meter must look like 3/4, 4/4, or 6/8.") from exc
     try:
         score = MuscriptorTranscriber(model_size=profile, device=device).run(
-            audio, output, bpm=bpm, instruments=conditioned
+            audio, output, bpm=bpm, instruments=conditioned,
+            detect_timing=detect_timing, meter_numerator=meter_numerator,
+            meter_denominator=meter_denominator, beat_unit_quarters=beat_unit,
         )
-    except (FileExistsError, MuscriptorUnavailableError, ValueError) as exc:
+    except (FileExistsError, MuscriptorUnavailableError, BeatTrackingError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     note_count = sum(len(part.notes) for part in score.parts)
+    for warning in score.timing_map.warnings if score.timing_map else []:
+        typer.echo(f"Timing warning: {warning}", err=True)
     typer.echo(
         f"Created instrument-specific JSON, MIDI, and MusicXML in {output} "
         f"({len(score.parts)} parts, {note_count} notes)."
     )
+
+
+@app.command("retime-score")
+def retime_score(
+    events: Annotated[Path, typer.Argument(exists=True, dir_okay=False, help="An existing events.json transcription.")],
+    audio: Annotated[Path, typer.Argument(exists=True, readable=True, help="The original audio used for the transcription.")],
+    output: Annotated[Path, typer.Option("--output", "-o", help="New directory for tempo-aware JSON, MIDI, and MusicXML.")],
+    meter: Annotated[str, typer.Option(help="Optional meter override such as 3/4 or 6/8.")] = "",
+    beat_unit: Annotated[float | None, typer.Option(help="Quarter lengths per detected pulse; 1.5 means a dotted-quarter pulse.")] = None,
+) -> None:
+    """Add detected beats, changing tempo, and notation quantization to an existing score."""
+    numerator = denominator = None
+    if meter:
+        try:
+            numerator, denominator = (int(value) for value in meter.split("/", 1))
+        except (ValueError, TypeError) as exc:
+            raise typer.BadParameter("Meter must look like 3/4, 4/4, or 6/8.") from exc
+    if output.exists():
+        raise typer.BadParameter(f"Refusing to overwrite existing output: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-", dir=output.parent))
+    try:
+        score = ScoreArtifact.read_json(events)
+        timing_map = BeatThisTracker().track(
+            audio, numerator=numerator, denominator=denominator,
+            beat_unit_quarters=beat_unit,
+        )
+        score.schema_version = "2.0"
+        score.timing_map = timing_map
+        score.quantized_parts = quantize_parts(score.parts, timing_map)
+        score.metadata.update({"timing_backend": timing_map.source, "bpm_assumption": None})
+        score.write_json(staging / "events.json")
+        write_multitrack_midi(score, staging / "arrangement.mid")
+        write_musicxml(score, staging / "score.musicxml")
+        staging.rename(output)
+    except (BeatTrackingError, ValueError) as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise typer.BadParameter(str(exc)) from exc
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    for warning in timing_map.warnings:
+        typer.echo(f"Timing warning: {warning}", err=True)
+    typer.echo(f"Created tempo-aware JSON, MIDI, and MusicXML in {output}.")
 
 
 @app.command()

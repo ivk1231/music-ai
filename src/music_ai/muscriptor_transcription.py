@@ -191,6 +191,10 @@ class MuscriptorTranscriber:
         output_dir: Path,
         bpm: int = 120,
         instruments: list[str] | None = None,
+        detect_timing: bool = False,
+        meter_numerator: int | None = None,
+        meter_denominator: int | None = None,
+        beat_unit_quarters: float | None = None,
     ) -> ScoreArtifact:
         from .midi import write_multitrack_midi
         from .notation import write_musicxml
@@ -204,14 +208,28 @@ class MuscriptorTranscriber:
         staging = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}-", dir=output_dir.parent))
         try:
             parts = self.transcribe_parts(audio_path, instruments=instruments)
-            score = ScoreArtifact("1.0", str(audio_path), parts, {
+            timing_map = None
+            quantized_parts = []
+            if detect_timing:
+                from .beat_tracking import BeatThisTracker
+                from .quantization import quantize_parts
+
+                timing_map = BeatThisTracker().track(
+                    audio_path,
+                    numerator=meter_numerator,
+                    denominator=meter_denominator,
+                    beat_unit_quarters=beat_unit_quarters,
+                )
+                quantized_parts = quantize_parts(parts, timing_map)
+            score = ScoreArtifact("2.0" if timing_map else "1.0", str(audio_path), parts, {
                 "backend": "muscriptor",
                 "model": self.model_size,
                 "device": self.device,
                 "instrument_conditioning": instruments,
-                "bpm_assumption": bpm,
+                "bpm_assumption": None if timing_map else bpm,
+                "timing_backend": timing_map.source if timing_map else "fixed-bpm",
                 "experimental": True,
-            })
+            }, timing_map, quantized_parts)
             score.write_json(staging / "events.json")
             write_multitrack_midi(score, staging / "arrangement.mid", bpm=bpm)
             write_musicxml(score, staging / "score.musicxml", bpm=bpm)

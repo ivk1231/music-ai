@@ -3,10 +3,58 @@
 Local, modular baseline for turning a music file into editable musical data:
 
 ```text
-MP3/WAV → Demucs stems → part labels → Basic Pitch note events → JSON + multitrack MIDI
+MP3/WAV → instrument notes + beat/downbeat map → quantized voices → JSON + MIDI + MusicXML
 ```
 
-This is a first vertical slice, not a claim of score-perfect transcription. Its durable output is `events.json`: a model-independent event format where a future correction UI, beat tracker/quantizer, MusicXML exporter, or custom model can operate. `arrangement.mid` opens in MuseScore, Sibelius, or a DAW.
+This is a first vertical slice, not a claim of score-perfect transcription. Its durable output is `events.json`: raw note seconds remain unchanged, while detected musical timing and quantized notation are stored as derived, replaceable data. `arrangement.mid` and `score.musicxml` open in MuseScore, Sibelius, or a DAW.
+
+## Tempo-aware notation
+
+The score path uses Beat This! 1.1.0 (`final0`, CPU, no DBN) to detect beats
+and downbeats. A monotonic timing warp maps the original note seconds into
+musical quarter-note positions. Notes are then quantized against straight and
+triplet grids, with chord grouping, independent voices, and minimum readable
+durations. MIDI receives a simplified changing-tempo curve; MusicXML receives
+measures, meter, voices, and ties across barlines.
+
+Install the timing dependency with the transcription model:
+
+```bash
+python -m pip install -e ".[dev,muscriptor,timing]"
+```
+
+Tempo-aware output is the default for `transcribe-score`. Expected-instrument
+selection remains available because automatic instrument identity is not yet
+reliable:
+
+```bash
+music-ai transcribe-score song.mp3 \
+  --profile small \
+  --instruments acoustic_piano,flutes,violin \
+  --output outputs/muscriptor/song
+```
+
+Add changing tempo to an existing transcription without rerunning MuScriptor:
+
+```bash
+music-ai retime-score outputs/old/events.json song.mp3 \
+  --output outputs/old-tempo-aware
+```
+
+Beat tracking cannot always distinguish meter notation such as 3/4 versus
+6/8, or a quarter-note pulse from a dotted-quarter pulse. Ambiguous analysis
+is reported as a warning. Use explicit overrides when the score is known:
+
+```bash
+music-ai transcribe-score song.mp3 --meter 6/8 --beat-unit 1.5 \
+  --output outputs/muscriptor/song-6-8
+```
+
+Use `--fixed-tempo --bpm 120` only for the legacy constant-tempo behavior.
+
+Pickup/anacrusis detection is preserved in the timing JSON but is not yet
+exported. The command stops with an explicit message instead of collapsing
+negative pickup positions into the first downbeat.
 
 ## Instrument-specific score transcription (MuScriptor)
 
@@ -34,7 +82,7 @@ download gated credentials for you.
 ```bash
 cd "/Users/immanuelkoshy/Documents/Music AI"
 source .venv/bin/activate
-pip install -e ".[dev,muscriptor]"
+python -m pip install -e ".[dev,muscriptor,timing]"
 
 # After you have accepted the model license, authenticate once:
 hf auth login
@@ -145,4 +193,7 @@ Adapters are deliberately narrow:
 - `transcription.py`: `BasicPitchTranscriber.transcribe()` returns `NoteEvent` values.
 - `domain.py`: versioned JSON schema boundary for correction, quantization and exporters.
 
-Next implementation steps are beat/downbeat detection and quantization, a review UI that edits events, drum transcription, and MusicXML export. Replace any adapter with a custom-trained model when evaluation says it is worthwhile.
+The remaining notation work is grand-staff engraving, richer time-signature
+change handling, confidence-guided manual beat correction, and a native Mac
+interface. Drum transcription also remains separate. Replace any adapter with
+a custom-trained model when evaluation says it is worthwhile.
