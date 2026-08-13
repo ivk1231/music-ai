@@ -1,0 +1,2 @@
+# Runtime dependencies; use Python 3.11 on Apple Silicon.
+-e .

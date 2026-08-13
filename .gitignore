@@ -1,0 +1,34 @@
+# Local Python environment and caches
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model and application caches
+.cache/
+.huggingface/
+.streamlit/
+
+# User audio and downloaded test recordings
+*.mp3
+*.wav
+*.ogg
+*.oga
+*.flac
+*.m4a
+
+# Generated transcription artifacts
+outputs/
+*.mid
+*.midi
+*.musicxml
+*.mxl
+*.pdf
+
+# macOS and editor files
+.DS_Store
+.idea/
+.vscode/

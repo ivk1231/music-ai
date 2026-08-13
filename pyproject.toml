@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "music-ai"
+version = "0.1.0"
+description = "Modular audio-to-editable-music baseline"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+  "basic-pitch>=0.4.0",
+  "demucs==4.0.1",
+  "mido>=1.3.2",
+  "music21>=9.7",
+  "pretty-midi>=0.2.10",
+  "soundfile>=0.12.1",
+  "transformers>=4.45,<6",
+  "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+review = ["streamlit>=1.39"]
+muscriptor = ["muscriptor==0.3.0"]
+
+[project.scripts]
+music-ai = "music_ai.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
